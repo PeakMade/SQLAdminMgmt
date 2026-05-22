@@ -46,6 +46,8 @@
         border-radius: 8px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         overflow: hidden;
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
     }
     
     table {
@@ -55,6 +57,9 @@
     
     thead {
         background: #f8f9fa;
+        position: sticky;
+        top: 0;
+        z-index: 10;
     }
     
     th {
@@ -72,6 +77,50 @@
     
     tr:hover {
         background: #f8f9fa;
+    }
+    
+    /* Toast Notifications */
+    .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: none;
+        align-items: center;
+        gap: 12px;
+        z-index: 1001;
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    .toast.show {
+        display: flex;
+    }
+    
+    .toast.success {
+        border-left: 4px solid #28a745;
+    }
+    
+    .toast.error {
+        border-left: 4px solid #dc3545;
+    }
+    
+    .toast-message {
+        color: #333;
+        font-weight: 500;
+    }
+    
+    @keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
     }
     
     .actions {
@@ -137,6 +186,24 @@
     .form-group select:focus {
         outline: none;
         border-color: #667eea;
+    }
+    
+    .form-group .read-only-value {
+        padding: 10px;
+        background: #f5f5f5;
+        border: 2px solid #e0e0e0;
+        border-radius: 5px;
+        font-size: 1rem;
+        color: #666;
+        display: none;
+    }
+    
+    .form-group .read-only-value.active {
+        display: block;
+    }
+    
+    .form-group input.hidden {
+        display: none;
     }
     
     .form-actions {
@@ -210,7 +277,7 @@
                 <td>{{ admin.DATE_CREATED.strftime('%Y-%m-%d %H:%M:%S') if admin.DATE_CREATED else 'N/A' }}</td>
                 <td>
                     <div class="actions">
-                        <button class="btn btn-sm btn-secondary" onclick="openEditModal({{ admin.ID }})">Edit</button>
+                        <button class="btn btn-sm btn-secondary" onclick="openEditModal({{ admin.ID }})">Edit Type</button>
                         <button class="btn btn-sm btn-danger" onclick="deleteAdmin({{ admin.ID }})">Delete</button>
                     </div>
                 </td>
@@ -236,6 +303,7 @@
             <div class="form-group">
                 <label for="adminEmail">Admin Email *</label>
                 <input type="email" id="adminEmail" name="admin_email" required>
+                <div id="adminEmailReadOnly" class="read-only-value"></div>
             </div>
             
             <div class="form-group">
@@ -244,13 +312,31 @@
             </div>
             
             <div class="form-group">
-                <label for="appId">App ID *</label>
-                <input type="number" id="appId" name="app_id" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="appName">App Name *</label>
-                <input type="text" id="appName" name="app_name" required>
+                <label for="appSelect">Select Application *</label>
+                <select id="appSelect" name="app_select" required>
+                    <option value="">-- Choose an Application --</option>
+                    <option value="16">New Hire Alert</option>
+                    <option value="17">Vendor Setup</option>
+                    <option value="18">Special Handling</option>
+                    <option value="19">Rush Check</option>
+                    <option value="20">FastTrack Recommendation</option>
+                    <option value="21">Mentor Certification</option>
+                    <option value="22">Cultivate Nomination</option>
+                    <option value="24">Peak Mindset</option>
+                    <option value="25">PeakLink</option>
+                    <option value="26">The Pitch</option>
+                    <option value="27">PAF Alert</option>
+                    <option value="28">Renaming</option>
+                    <option value="29">PMA Abstract</option>
+                    <option value="30">Management Fee</option>
+                    <option value="31">Innovation Ideas</option>
+                    <option value="32">Idea Factory</option>
+                    <option value="33">Contract Analyzer</option>
+                    <option value="34">Surprise</option>
+                </select>
+                <input type="hidden" id="appId" name="app_id">
+                <input type="hidden" id="appName" name="app_name">
+                <div id="appIdReadOnly" class="read-only-value"></div>
             </div>
             
             <div class="form-actions">
@@ -260,6 +346,11 @@
         </form>
     </div>
 </div>
+
+<!-- Toast Notification -->
+<div id="toast" class="toast">
+    <span id="toastMessage" class="toast-message"></span>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -267,44 +358,131 @@
     let isEditMode = false;
     let currentEditId = null;
     
+    // App ID to App Name mapping
+    const appMapping = {
+        16: 'New Hire Alert',
+        17: 'Vendor Setup',
+        18: 'Special Handling',
+        19: 'Rush Check',
+        20: 'FastTrack Recommendation',
+        21: 'Mentor Certification',
+        22: 'Cultivate Nomination',
+        24: 'Peak Mindset',
+        25: 'PeakLink',
+        26: 'The Pitch',
+        27: 'PAF Alert',
+        28: 'Renaming',
+        29: 'PMA Abstract',
+        30: 'Management Fee',
+        31: 'Innovation Ideas',
+        32: 'Idea Factory',
+        33: 'Contract Analyzer',
+        34: 'Surprise'
+    };
+    
+    // Toast notification function
+    function showToast(message, type = 'success') {
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toastMessage');
+        
+        toastMessage.textContent = message;
+        toast.className = `toast ${type} show`;
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+    
+    // Handle app selection change
+    document.getElementById('appSelect').addEventListener('change', function() {
+        const selectedAppId = this.value;
+        if (selectedAppId) {
+            document.getElementById('appId').value = selectedAppId;
+            document.getElementById('appName').value = appMapping[selectedAppId];
+        } else {
+            document.getElementById('appId').value = '';
+            document.getElementById('appName').value = '';
+        }
+    });
+    
     function openCreateModal() {
         isEditMode = false;
         currentEditId = null;
         document.getElementById('modalTitle').textContent = 'Add New Admin';
         document.getElementById('adminForm').reset();
         document.getElementById('adminId').value = '';
+        
+        // Show email input, hide read-only display
+        document.getElementById('adminEmail').classList.remove('hidden');
+        document.getElementById('adminEmailReadOnly').classList.remove('active');
+        
+        // Show app dropdown selector, hide read-only display
+        document.getElementById('appSelect').style.display = 'block';
+        document.getElementById('appIdReadOnly').classList.remove('active');
+        
+        // Make fields required
+        document.getElementById('adminEmail').required = true;
+        document.getElementById('appSelect').required = true;
+        
         document.getElementById('adminModal').classList.add('active');
     }
     
     function openEditModal(id) {
         isEditMode = true;
         currentEditId = id;
-        document.getElementById('modalTitle').textContent = 'Edit Admin';
+        document.getElementById('modalTitle').textContent = 'Edit Admin Type';
         
         // Fetch admin data
-        fetch(`/api/admins/${id}`)
+        fetch(`/api/admins/${id}`, {
+            credentials: 'same-origin'
+        })
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
                     const admin = result.data;
                     document.getElementById('adminId').value = admin.ID;
+                    
+                    // Set values in hidden inputs (needed for form submission)
                     document.getElementById('adminEmail').value = admin.ADMIN_EMAIL;
-                    document.getElementById('adminType').value = admin.ADMIN_TYPE;
                     document.getElementById('appId').value = admin.APP_ID;
                     document.getElementById('appName').value = admin.APP_NAME;
+                    
+                    // Show read-only values
+                    document.getElementById('adminEmailReadOnly').textContent = admin.ADMIN_EMAIL;
+                    document.getElementById('appIdReadOnly').textContent = `${admin.APP_ID} - ${admin.APP_NAME}`;
+                    
+                    // Hide input fields and dropdown, show read-only displays
+                    document.getElementById('adminEmail').classList.add('hidden');
+                    document.getElementById('adminEmailReadOnly').classList.add('active');
+                    document.getElementById('appSelect').style.display = 'none';
+                    document.getElementById('appIdReadOnly').classList.add('active');
+                    
+                    // Remove required attribute from hidden fields
+                    document.getElementById('adminEmail').required = false;
+                    document.getElementById('appSelect').required = false;
+                    
+                    // Set admin type (only editable field)
+                    document.getElementById('adminType').value = admin.ADMIN_TYPE;
+                    
                     document.getElementById('adminModal').classList.add('active');
                 } else {
-                    alert('Error loading admin: ' + result.error);
+                    showToast('Error loading admin: ' + result.error, 'error');
                 }
             })
             .catch(error => {
-                alert('Error loading admin: ' + error);
+                showToast('Error loading admin: ' + error, 'error');
             });
     }
     
     function closeModal() {
         document.getElementById('adminModal').classList.remove('active');
         document.getElementById('adminForm').reset();
+        
+        // Reset to show input fields and dropdown when reopening
+        document.getElementById('adminEmail').classList.remove('hidden');
+        document.getElementById('adminEmailReadOnly').classList.remove('active');
+        document.getElementById('appSelect').style.display = 'block';
+        document.getElementById('appIdReadOnly').classList.remove('active');
     }
     
     function deleteAdmin(id) {
@@ -313,18 +491,20 @@
         }
         
         fetch(`/api/admins/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            credentials: 'same-origin'
         })
         .then(response => response.json())
         .then(result => {
             if (result.success) {
-                location.reload();
+                showToast('Admin deleted successfully!', 'success');
+                setTimeout(() => location.reload(), 1000);
             } else {
-                alert('Error deleting admin: ' + result.error);
+                showToast('Error: ' + result.error, 'error');
             }
         })
         .catch(error => {
-            alert('Error deleting admin: ' + error);
+            showToast('Error: ' + error, 'error');
         });
     }
     
@@ -346,18 +526,21 @@
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(formData),
+            credentials: 'same-origin'
         })
         .then(response => response.json())
         .then(result => {
             if (result.success) {
-                location.reload();
+                closeModal();
+                showToast(isEditMode ? 'Admin updated successfully!' : 'Admin created successfully!', 'success');
+                setTimeout(() => location.reload(), 1000);
             } else {
-                alert('Error saving admin: ' + result.error);
+                showToast('Error: ' + result.error, 'error');
             }
         })
         .catch(error => {
-            alert('Error saving admin: ' + error);
+            showToast('Error: ' + error, 'error');
         });
     });
     
