@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block extra_styles %}
+<style>
+    .actions-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+    
+    .btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 0.875rem;
+    }
+    
+    .btn-danger {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    }
+    
+    .btn-secondary {
+        background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+    }
+    
+    .table-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    thead {
+        background: #f8f9fa;
+    }
+    
+    th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        color: #555;
+        border-bottom: 2px solid #e0e0e0;
+    }
+    
+    td {
+        padding: 15px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    tr:hover {
+        background: #f8f9fa;
+    }
+    
+    .actions {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal.active {
+        display: flex;
+    }
+    
+    .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 8px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+        color: #667eea;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #555;
+    }
+    
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 5px;
+        font-size: 1rem;
+        transition: border-color 0.3s;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 25px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #999;
+    }
+    
+    .empty-state h3 {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 40px;
+    }
+    
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="actions-bar">
+    <h2>App Admins</h2>
+    <button class="btn" onclick="openCreateModal()">+ Add New Admin</button>
+</div>
+
+<div class="table-container">
+    {% if admins %}
+    <table id="adminsTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Email</th>
+                <th>Type</th>
+                <th>App ID</th>
+                <th>App Name</th>
+                <th>Date Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for admin in admins %}
+            <tr data-id="{{ admin.ID }}">
+                <td>{{ admin.ID }}</td>
+                <td>{{ admin.ADMIN_EMAIL }}</td>
+                <td>{{ admin.ADMIN_TYPE }}</td>
+                <td>{{ admin.APP_ID }}</td>
+                <td>{{ admin.APP_NAME }}</td>
+                <td>{{ admin.DATE_CREATED.strftime('%Y-%m-%d %H:%M:%S') if admin.DATE_CREATED else 'N/A' }}</td>
+                <td>
+                    <div class="actions">
+                        <button class="btn btn-sm btn-secondary" onclick="openEditModal({{ admin.ID }})">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteAdmin({{ admin.ID }})">Delete</button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <h3>No admins found</h3>
+        <p>Click "Add New Admin" to create your first record</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Create/Edit Modal -->
+<div id="adminModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header" id="modalTitle">Add New Admin</div>
+        <form id="adminForm">
+            <input type="hidden" id="adminId" name="id">
+            
+            <div class="form-group">
+                <label for="adminEmail">Admin Email *</label>
+                <input type="email" id="adminEmail" name="admin_email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="adminType">Admin Type *</label>
+                <input type="text" id="adminType" name="admin_type" required placeholder="e.g., Owner, Admin, ReadOnly">
+            </div>
+            
+            <div class="form-group">
+                <label for="appId">App ID *</label>
+                <input type="number" id="appId" name="app_id" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="appName">App Name *</label>
+                <input type="text" id="appName" name="app_name" required>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn" id="submitBtn">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let isEditMode = false;
+    let currentEditId = null;
+    
+    function openCreateModal() {
+        isEditMode = false;
+        currentEditId = null;
+        document.getElementById('modalTitle').textContent = 'Add New Admin';
+        document.getElementById('adminForm').reset();
+        document.getElementById('adminId').value = '';
+        document.getElementById('adminModal').classList.add('active');
+    }
+    
+    function openEditModal(id) {
+        isEditMode = true;
+        currentEditId = id;
+        document.getElementById('modalTitle').textContent = 'Edit Admin';
+        
+        // Fetch admin data
+        fetch(`/api/admins/${id}`)
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    const admin = result.data;
+                    document.getElementById('adminId').value = admin.ID;
+                    document.getElementById('adminEmail').value = admin.ADMIN_EMAIL;
+                    document.getElementById('adminType').value = admin.ADMIN_TYPE;
+                    document.getElementById('appId').value = admin.APP_ID;
+                    document.getElementById('appName').value = admin.APP_NAME;
+                    document.getElementById('adminModal').classList.add('active');
+                } else {
+                    alert('Error loading admin: ' + result.error);
+                }
+            })
+            .catch(error => {
+                alert('Error loading admin: ' + error);
+            });
+    }
+    
+    function closeModal() {
+        document.getElementById('adminModal').classList.remove('active');
+        document.getElementById('adminForm').reset();
+    }
+    
+    function deleteAdmin(id) {
+        if (!confirm('Are you sure you want to delete this admin?')) {
+            return;
+        }
+        
+        fetch(`/api/admins/${id}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                location.reload();
+            } else {
+                alert('Error deleting admin: ' + result.error);
+            }
+        })
+        .catch(error => {
+            alert('Error deleting admin: ' + error);
+        });
+    }
+    
+    document.getElementById('adminForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            admin_email: document.getElementById('adminEmail').value,
+            admin_type: document.getElementById('adminType').value,
+            app_id: document.getElementById('appId').value,
+            app_name: document.getElementById('appName').value
+        };
+        
+        const url = isEditMode ? `/api/admins/${currentEditId}` : '/api/admins';
+        const method = isEditMode ? 'PUT' : 'POST';
+        
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                location.reload();
+            } else {
+                alert('Error saving admin: ' + result.error);
+            }
+        })
+        .catch(error => {
+            alert('Error saving admin: ' + error);
+        });
+    });
+    
+    // Close modal when clicking outside
+    document.getElementById('adminModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+</script>
+{% endblock %}
