@@ -1,14 +1,19 @@
 # Fabric SQL Admin Manager
 
-Flask web application for managing the APP_ADMINS table in Microsoft Fabric SQL.
+[![Build and deploy Python app to Azure Web App - SQLAdminMgmt](https://github.com/PeakMade/SQLAdminMgmt/actions/workflows/main_sqladminmgmt.yml/badge.svg)](https://github.com/PeakMade/SQLAdminMgmt/actions/workflows/main_sqladminmgmt.yml)
+
+Flask web application for managing the APP_ADMINS table in Microsoft Fabric SQL. Provides both a web UI for manual administration and a REST API for programmatic access from other applications.
 
 ## Features
 
+- **Hybrid Access**: Web UI for manual management + REST API for programmatic access
+- **Dual Authentication**: Azure AD for web users, API keys for app-to-app communication
 - **Azure AD Authentication**: Secure login with Microsoft identity platform
 - **Fabric SQL Connection**: Service principal authentication to Fabric SQL
 - **CRUD Operations**: Create, Read, Update, Delete admin records
 - **Modern UI**: Clean, responsive interface matching your existing apps
-- **Single Sign-On**: Leverages existing browser sessions
+- **CORS Support**: Cross-origin API access for distributed applications
+- **Client Library**: Ready-to-use Python client for easy integration
 
 ## Prerequisites
 
