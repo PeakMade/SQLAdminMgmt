@@ -7,6 +7,13 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 30px;
+        gap: 15px;
+    }
+    
+    .actions-bar-left {
+        display: flex;
+        align-items: center;
+        gap: 15px;
     }
     
     .btn {
@@ -41,6 +48,31 @@
         background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
     }
     
+    .btn-outline {
+        background: white;
+        color: #667eea;
+        border: 2px solid #667eea;
+    }
+    
+    .btn-outline:hover {
+        background: #667eea;
+        color: white;
+    }
+    
+    .filter-badge {
+        display: none;
+        background: #667eea;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .filter-badge.active {
+        display: inline-block;
+    }
+    
     .table-container {
         background: white;
         border-radius: 8px;
@@ -68,6 +100,64 @@
         font-weight: 600;
         color: #555;
         border-bottom: 2px solid #e0e0e0;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        transition: background-color 0.2s;
+    }
+    
+    th:hover:not(.no-sort) {
+        background-color: #e9ecef;
+    }
+    
+    th.sortable::after {
+        content: '⇅';
+        margin-left: 8px;
+        color: #ccc;
+        font-size: 0.9rem;
+    }
+    
+    th.sortable.asc::after {
+        content: '↑';
+        color: #667eea;
+    }
+    
+    th.sortable.desc::after {
+        content: '↓';
+        color: #667eea;
+    }
+    
+    .filter-row {
+        background: white;
+    }
+    
+    .filter-row th {
+        padding: 8px 15px;
+        cursor: default;
+    }
+    
+    .filter-input {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        transition: border-color 0.2s;
+    }
+    
+    .filter-input:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+    
+    .filter-select {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        background: white;
+        cursor: pointer;
     }
     
     td {
@@ -248,8 +338,14 @@
 
 {% block content %}
 <div class="actions-bar">
-    <h2>App Admins</h2>
-    <button class="btn" onclick="openCreateModal()">+ Add New Admin</button>
+    <div class="actions-bar-left">
+        <h2>App Admins</h2>
+        <span id="filterBadge" class="filter-badge">Filters Active</span>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn btn-outline btn-sm" id="clearFiltersBtn" onclick="clearAllFilters()" style="display: none;">Clear Filters</button>
+        <button class="btn" onclick="openCreateModal()">+ Add New Admin</button>
+    </div>
 </div>
 
 <div class="table-container">
@@ -257,24 +353,33 @@
     <table id="adminsTable">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Email</th>
-                <th>Type</th>
-                <th>App ID</th>
-                <th>App Name</th>
-                <th>Date Created</th>
-                <th>Actions</th>
+                <th class="sortable" data-column="id" data-type="number">ID</th>
+                <th class="sortable" data-column="email" data-type="string">Email</th>
+                <th class="sortable" data-column="type" data-type="string">Type</th>
+                <th class="sortable" data-column="app_id" data-type="number">App ID</th>
+                <th class="sortable" data-column="app_name" data-type="string">App Name</th>
+                <th class="sortable" data-column="date" data-type="date">Date Created</th>
+                <th class="no-sort">Actions</th>
+            </tr>
+            <tr class="filter-row">
+                <th></th>
+                <th><input type="text" class="filter-input" data-column="email" placeholder="Filter Email..."></th>
+                <th><input type="text" class="filter-input" data-column="type" placeholder="Filter Type..."></th>
+                <th></th>
+                <th><input type="text" class="filter-input" data-column="app_name" placeholder="Filter App Name..."></th>
+                <th><input type="text" class="filter-input" data-column="date" placeholder="Filter Date..."></th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
             {% for admin in admins %}
             <tr data-id="{{ admin.ID }}">
-                <td>{{ admin.ID }}</td>
-                <td>{{ admin.ADMIN_EMAIL }}</td>
-                <td>{{ admin.ADMIN_TYPE }}</td>
-                <td>{{ admin.APP_ID }}</td>
-                <td>{{ admin.APP_NAME }}</td>
-                <td>{{ admin.DATE_CREATED.strftime('%Y-%m-%d %H:%M:%S') if admin.DATE_CREATED else 'N/A' }}</td>
+                <td data-value="{{ admin.ID }}">{{ admin.ID }}</td>
+                <td data-value="{{ admin.ADMIN_EMAIL }}">{{ admin.ADMIN_EMAIL }}</td>
+                <td data-value="{{ admin.ADMIN_TYPE }}">{{ admin.ADMIN_TYPE }}</td>
+                <td data-value="{{ admin.APP_ID }}">{{ admin.APP_ID }}</td>
+                <td data-value="{{ admin.APP_NAME }}">{{ admin.APP_NAME }}</td>
+                <td data-value="{{ admin.DATE_CREATED.isoformat() if admin.DATE_CREATED else '' }}">{{ admin.DATE_CREATED.strftime('%Y-%m-%d') if admin.DATE_CREATED else 'N/A' }}</td>
                 <td>
                     <div class="actions">
                         <button class="btn btn-sm btn-secondary" onclick="openEditModal({{ admin.ID }})">Edit Type</button>
@@ -550,5 +655,178 @@
             closeModal();
         }
     });
+    
+    // ===== SORTING AND FILTERING =====
+    
+    let currentSort = {
+        column: null,
+        direction: null // 'asc' or 'desc'
+    };
+    
+    // Initialize sorting
+    document.querySelectorAll('th.sortable').forEach(header => {
+        header.addEventListener('click', function() {
+            const column = this.getAttribute('data-column');
+            const type = this.getAttribute('data-type');
+            
+            // Toggle sort direction
+            if (currentSort.column === column) {
+                if (currentSort.direction === 'asc') {
+                    currentSort.direction = 'desc';
+                } else if (currentSort.direction === 'desc') {
+                    currentSort.direction = null;
+                    currentSort.column = null;
+                } else {
+                    currentSort.direction = 'asc';
+                }
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'asc';
+            }
+            
+            // Update header classes
+            document.querySelectorAll('th.sortable').forEach(h => {
+                h.classList.remove('asc', 'desc');
+            });
+            
+            if (currentSort.direction) {
+                this.classList.add(currentSort.direction);
+            }
+            
+            sortTable(column, currentSort.direction, type);
+        });
+    });
+    
+    function sortTable(column, direction, type) {
+        const tbody = document.querySelector('#adminsTable tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        
+        if (!direction) {
+            // Reset to original order (by ID)
+            rows.sort((a, b) => {
+                const aId = parseInt(a.querySelector('td[data-value]').getAttribute('data-value'));
+                const bId = parseInt(b.querySelector('td[data-value]').getAttribute('data-value'));
+                return aId - bId;
+            });
+        } else {
+            rows.sort((a, b) => {
+                const aCell = a.querySelector(`td:nth-child(${getColumnIndex(column)})`);
+                const bCell = b.querySelector(`td:nth-child(${getColumnIndex(column)})`);
+                
+                let aValue = aCell.getAttribute('data-value') || aCell.textContent.trim();
+                let bValue = bCell.getAttribute('data-value') || bCell.textContent.trim();
+                
+                // Handle different data types
+                if (type === 'number') {
+                    aValue = parseFloat(aValue) || 0;
+                    bValue = parseFloat(bValue) || 0;
+                } else if (type === 'date') {
+                    aValue = aValue ? new Date(aValue) : new Date(0);
+                    bValue = bValue ? new Date(bValue) : new Date(0);
+                } else {
+                    aValue = aValue.toLowerCase();
+                    bValue = bValue.toLowerCase();
+                }
+                
+                if (direction === 'asc') {
+                    return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+                } else {
+                    return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+                }
+            });
+        }
+        
+        // Re-append rows in sorted order
+        rows.forEach(row => tbody.appendChild(row));
+    }
+    
+    function getColumnIndex(column) {
+        const columnMap = {
+            'id': 1,
+            'email': 2,
+            'type': 3,
+            'app_id': 4,
+            'app_name': 5,
+            'date': 6
+        };
+        return columnMap[column];
+    }
+    
+    // Initialize filtering
+    document.querySelectorAll('.filter-input').forEach(input => {
+        input.addEventListener('input', filterTable);
+        input.addEventListener('keyup', filterTable);
+    });
+    
+    function filterTable() {
+        const filters = {};
+        
+        // Collect all filter values
+        document.querySelectorAll('.filter-input').forEach(input => {
+            const column = input.getAttribute('data-column');
+            const value = input.value.trim().toLowerCase();
+            if (value) {
+                filters[column] = value;
+            }
+        });
+        
+        // Show/hide clear button and badge
+        const hasFilters = Object.keys(filters).length > 0;
+        document.getElementById('clearFiltersBtn').style.display = hasFilters ? 'inline-block' : 'none';
+        document.getElementById('filterBadge').classList.toggle('active', hasFilters);
+        
+        // Filter rows
+        const rows = document.querySelectorAll('#adminsTable tbody tr');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            let show = true;
+            
+            for (const [column, filterValue] of Object.entries(filters)) {
+                const cell = row.querySelector(`td:nth-child(${getColumnIndex(column)})`);
+                const cellValue = (cell.getAttribute('data-value') || cell.textContent).toLowerCase();
+                
+                if (!cellValue.includes(filterValue)) {
+                    show = false;
+                    break;
+                }
+            }
+            
+            if (show) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        // Show/hide empty state
+        const tbody = document.querySelector('#adminsTable tbody');
+        const existingEmptyMsg = tbody.querySelector('.no-results-row');
+        
+        if (visibleCount === 0 && Object.keys(filters).length > 0) {
+            if (!existingEmptyMsg) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.className = 'no-results-row';
+                emptyRow.innerHTML = '<td colspan="7" style="text-align: center; padding: 40px; color: #999;">No matching results found. Try adjusting your filters.</td>';
+                tbody.appendChild(emptyRow);
+            }
+        } else if (existingEmptyMsg) {
+            existingEmptyMsg.remove();
+        }
+    }
+    
+    function clearAllFilters() {
+        // Clear all filter inputs
+        document.querySelectorAll('.filter-input').forEach(input => {
+            input.value = '';
+        });
+        
+        // Reset filter display
+        filterTable();
+        
+        // Show toast notification
+        showToast('Filters cleared', 'success');
+    }
 </script>
 {% endblock %}
